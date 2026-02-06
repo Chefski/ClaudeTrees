@@ -28,6 +28,13 @@ struct WorktreeRow: View {
             }
             Spacer()
             Button {
+                NSWorkspace.shared.open(URL(fileURLWithPath: worktree.path))
+            } label: {
+                Image(systemName: "folder")
+            }
+            .buttonStyle(.plain)
+            .help("Open in Finder")
+            Button {
                 onOpen()
             } label: {
                 Image(systemName: "terminal")
