@@ -17,17 +17,17 @@ final class AppSettings {
         didSet { save() }
     }
 
-    var launchAtLogin: Bool {
-        get { SMAppService.mainApp.status == .enabled }
-        set {
+    var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled {
+        didSet {
+            guard launchAtLogin != oldValue else { return }
             do {
-                if newValue {
+                if launchAtLogin {
                     try SMAppService.mainApp.register()
                 } else {
                     try SMAppService.mainApp.unregister()
                 }
             } catch {
-                print("Failed to \(newValue ? "enable" : "disable") launch at login: \(error)")
+                print("Failed to \(launchAtLogin ? "enable" : "disable") launch at login: \(error)")
             }
         }
     }
