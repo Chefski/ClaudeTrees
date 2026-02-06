@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import ServiceManagement
 
 @Observable
 final class AppSettings {
@@ -14,6 +15,21 @@ final class AppSettings {
     }
     var claudeCLIPath: String {
         didSet { save() }
+    }
+
+    var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled {
+        didSet {
+            guard launchAtLogin != oldValue else { return }
+            do {
+                if launchAtLogin {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+            } catch {
+                print("Failed to \(launchAtLogin ? "enable" : "disable") launch at login: \(error)")
+            }
+        }
     }
 
     private let defaults: UserDefaults

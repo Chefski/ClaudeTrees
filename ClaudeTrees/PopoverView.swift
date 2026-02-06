@@ -15,6 +15,8 @@ struct PopoverView: View {
 
     @State private var selectedTab: Tab = .mcps
     @State private var showSettings = false
+    @State private var showNewWorktreeSheet = false
+    @State private var newWorktreeRepo: Repo?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,12 +43,22 @@ struct PopoverView: View {
             case .mcps:
                 MCPListView()
             case .worktrees:
-                WorktreeListView()
+                WorktreeListView(
+                    showNewWorktreeSheet: $showNewWorktreeSheet,
+                    newWorktreeRepo: $newWorktreeRepo
+                )
             }
         }
         .frame(width: 360, height: 440)
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
+        .overlay {
+            if showNewWorktreeSheet, let repo = newWorktreeRepo {
+                NewWorktreeSheet(repo: repo, isPresented: $showNewWorktreeSheet)
+            }
+        }
+        .overlay {
+            if showSettings {
+                SettingsView(isPresented: $showSettings)
+            }
         }
     }
 }
