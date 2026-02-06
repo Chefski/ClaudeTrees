@@ -40,7 +40,7 @@ struct WorktreeRow: View {
                 Image(systemName: "terminal")
             }
             .buttonStyle(.plain)
-            .help("Open in terminal with Claude")
+            .help("Open in terminal")
         }
         .padding(.vertical, 2)
     }
