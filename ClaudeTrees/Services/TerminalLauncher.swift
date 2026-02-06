@@ -47,155 +47,158 @@ enum TerminalApp: String, CaseIterable, Codable, Identifiable {
 
 struct TerminalLauncher {
 
-    static func open(path: String, terminal: TerminalApp, claudeCLIPath: String) {
-        let expandedCLI = NSString(string: claudeCLIPath).expandingTildeInPath
-        let command = "cd \(shellEscape(path)) && \(shellEscape(expandedCLI))"
+    static func open(path: String, terminal: TerminalApp, claudeCLIPath _: String) {
+        let resolvedPath = normalizePath(path)
 
         switch terminal {
         case .ghostty:
-            openGhostty(command: command)
+            openGhostty(path: resolvedPath)
         case .terminal:
-            openTerminalApp(command: command)
+            openTerminalApp(path: resolvedPath)
         case .iterm:
-            openITerm(command: command)
+            openITerm(path: resolvedPath)
         case .warp:
-            openWarp(path: path, command: expandedCLI)
+            openWarp(path: resolvedPath)
         case .alacritty:
-            openAlacritty(path: path, command: expandedCLI)
+            openAlacritty(path: resolvedPath)
         case .kitty:
-            openKitty(path: path, command: expandedCLI)
+            openKitty(path: resolvedPath)
         case .wezterm:
-            openWezTerm(path: path, command: expandedCLI)
+            openWezTerm(path: resolvedPath)
         case .rio:
-            openRio(path: path, command: expandedCLI)
+            openRio(path: resolvedPath)
         }
     }
 
     // MARK: - Terminal Implementations
 
-    private static func openGhostty(command: String) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        process.arguments = ["-a", "Ghostty", "--args", "-e", command]
-        try? process.run()
-    }
+    private static func openGhostty(path: String) {
+        guard let appURL = TerminalApp.ghostty.appURL else { return }
+        let binary = appURL.appendingPathComponent("Contents/MacOS/ghostty")
 
-    private static func openTerminalApp(command: String) {
-        let src = """
-        tell application "Terminal"
-            activate
-            do script "\(command.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))"
-        end tell
-        """
-        if let script = NSAppleScript(source: src) {
-            var error: NSDictionary?
-            script.executeAndReturnError(&error)
+        let process = Process()
+        process.executableURL = binary
+        configureWorkingDirectory(process, path: path)
+        process.arguments = ["--working-directory=\(path)"]
+
+        do {
+            try process.run()
+        } catch {
+            let fallback = Process()
+            fallback.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            configureWorkingDirectory(fallback, path: path)
+            fallback.arguments = ["-na", "Ghostty", "--args", "--working-directory=\(path)"]
+            try? fallback.run()
         }
     }
 
-    private static func openITerm(command: String) {
-        let src = """
-        tell application "iTerm2"
-            activate
-            create window with default profile command "\(command.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))"
-        end tell
-        """
-        if let script = NSAppleScript(source: src) {
-            var error: NSDictionary?
-            script.executeAndReturnError(&error)
-        }
+    private static func openTerminalApp(path: String) {
+        openDirectory(path: path, terminal: .terminal)
     }
 
-    private static func openWarp(path: String, command: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(command, forType: .string)
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        process.arguments = ["-a", "Warp", path]
-        try? process.run()
-
-        let alert = NSAlert()
-        alert.messageText = "Claude CLI Copied"
-        alert.informativeText = "Warp doesn't support launching commands automatically. The Claude command has been copied to your clipboard — paste (⌘V) in the Warp window to start."
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
+    private static func openITerm(path: String) {
+        openDirectory(path: path, terminal: .iterm)
     }
 
-    private static func openAlacritty(path: String, command: String) {
+    private static func openWarp(path: String) {
+        openDirectory(path: path, terminal: .warp)
+    }
+
+    private static func openAlacritty(path: String) {
         guard let appURL = TerminalApp.alacritty.appURL else { return }
         let binary = appURL.appendingPathComponent("Contents/MacOS/alacritty")
 
         let process = Process()
         process.executableURL = binary
-        process.arguments = ["--working-directory", path, "-e", "/bin/sh", "-c", command]
+        configureWorkingDirectory(process, path: path)
+        process.arguments = ["--working-directory", path]
 
         do {
             try process.run()
         } catch {
             let fallback = Process()
             fallback.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            fallback.arguments = ["-a", "Alacritty", "--args", "--working-directory", path, "-e", "/bin/sh", "-c", command]
+            configureWorkingDirectory(fallback, path: path)
+            fallback.arguments = ["-a", "Alacritty", "--args", "--working-directory", path]
             try? fallback.run()
         }
     }
 
-    private static func openKitty(path: String, command: String) {
+    private static func openKitty(path: String) {
         guard let appURL = TerminalApp.kitty.appURL else { return }
         let binary = appURL.appendingPathComponent("Contents/MacOS/kitty")
 
         let process = Process()
         process.executableURL = binary
-        process.arguments = ["--directory", path, "/bin/sh", "-c", command]
+        configureWorkingDirectory(process, path: path)
+        process.arguments = ["--directory", path]
 
         do {
             try process.run()
         } catch {
             let fallback = Process()
             fallback.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            fallback.arguments = ["-a", "kitty", "--args", "--directory", path, "/bin/sh", "-c", command]
+            configureWorkingDirectory(fallback, path: path)
+            fallback.arguments = ["-a", "kitty", "--args", "--directory", path]
             try? fallback.run()
         }
     }
 
-    private static func openWezTerm(path: String, command: String) {
+    private static func openWezTerm(path: String) {
         guard let appURL = TerminalApp.wezterm.appURL else { return }
         let binary = appURL.appendingPathComponent("Contents/MacOS/wezterm-gui")
 
         let process = Process()
         process.executableURL = binary
-        process.arguments = ["start", "--cwd", path, "--", "/bin/sh", "-c", command]
+        configureWorkingDirectory(process, path: path)
+        process.arguments = ["start", "--cwd", path]
 
         do {
             try process.run()
         } catch {
             let fallback = Process()
             fallback.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            fallback.arguments = ["-a", "WezTerm", "--args", "start", "--cwd", path, "--", "/bin/sh", "-c", command]
+            configureWorkingDirectory(fallback, path: path)
+            fallback.arguments = ["-a", "WezTerm", "--args", "start", "--cwd", path]
             try? fallback.run()
         }
     }
 
-    private static func openRio(path: String, command: String) {
+    private static func openRio(path: String) {
         guard let appURL = TerminalApp.rio.appURL else { return }
         let binary = appURL.appendingPathComponent("Contents/MacOS/rio")
 
         let process = Process()
         process.executableURL = binary
-        process.arguments = ["--working-dir", path, "-e", "/bin/sh", "-c", command]
+        configureWorkingDirectory(process, path: path)
+        process.arguments = ["--working-dir", path]
 
         do {
             try process.run()
         } catch {
             let fallback = Process()
             fallback.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            fallback.arguments = ["-a", "Rio", "--args", "--working-dir", path, "-e", "/bin/sh", "-c", command]
+            configureWorkingDirectory(fallback, path: path)
+            fallback.arguments = ["-a", "Rio", "--args", "--working-dir", path]
             try? fallback.run()
         }
     }
 
-    private static func shellEscape(_ str: String) -> String {
-        "'" + str.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    private static func normalizePath(_ path: String) -> String {
+        let expanded = NSString(string: path).expandingTildeInPath
+        return URL(fileURLWithPath: expanded).standardizedFileURL.path(percentEncoded: false)
+    }
+
+    private static func configureWorkingDirectory(_ process: Process, path: String) {
+        process.currentDirectoryURL = URL(fileURLWithPath: path)
+    }
+
+    private static func openDirectory(path: String, terminal: TerminalApp) {
+        guard let appURL = terminal.appURL else { return }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = ["-a", appURL.path, path]
+        configureWorkingDirectory(process, path: path)
+        try? process.run()
     }
 }
