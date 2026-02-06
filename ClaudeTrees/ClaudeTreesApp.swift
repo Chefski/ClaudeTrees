@@ -10,8 +10,9 @@ import SwiftUI
 @main
 struct ClaudeTreesApp: App {
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        MenuBarExtra("ClaudeTrees", systemImage: "arrow.triangle.branch") {
+            PopoverView()
         }
+        .menuBarExtraStyle(.window)
     }
 }
