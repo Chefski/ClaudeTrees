@@ -14,27 +14,39 @@ struct PopoverView: View {
     }
 
     @State private var selectedTab: Tab = .mcps
+    @State private var showSettings = false
 
     var body: some View {
-        VStack {
-            Picker("Tab", selection: $selectedTab) {
-                ForEach(Tab.allCases, id: \.self) { tab in
-                    Text(tab.rawValue).tag(tab)
+        VStack(spacing: 0) {
+            HStack {
+                Picker("Tab", selection: $selectedTab) {
+                    ForEach(Tab.allCases, id: \.self) { tab in
+                        Text(tab.rawValue).tag(tab)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
+                Button {
+                    showSettings = true
+                } label: {
+                    Image(systemName: "gear")
+                }
+                .buttonStyle(.plain)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            .padding([.horizontal, .top])
+            .padding(.bottom, 8)
 
             switch selectedTab {
             case .mcps:
-                Text("MCPs content")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                MCPListView()
             case .worktrees:
-                Text("Worktrees content")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                WorktreeListView()
             }
         }
-        .padding()
-        .frame(width: 320, height: 400)
+        .frame(width: 360, height: 440)
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+        }
     }
 }
