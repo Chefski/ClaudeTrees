@@ -18,6 +18,11 @@ struct SettingsView: View {
                 .font(.headline)
 
             Form {
+                Toggle("Launch at Login", isOn: Binding(
+                    get: { settings.launchAtLogin },
+                    set: { settings.launchAtLogin = $0 }
+                ))
+
                 Picker("Terminal:", selection: $settings.preferredTerminal) {
                     ForEach(TerminalApp.allCases) { terminal in
                         Text(terminal.rawValue).tag(terminal)
