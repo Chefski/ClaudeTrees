@@ -10,10 +10,9 @@ import SwiftUI
 struct NewWorktreeSheet: View {
     @Environment(GitService.self) private var gitService
     @Environment(AppSettings.self) private var appSettings
-    @Environment(\.dismiss) private var dismiss
 
     let repo: Repo
-    let onCreated: () async -> Void
+    @Binding var isPresented: Bool
 
     @State private var branchName = ""
     @State private var baseBranch = "main"
@@ -22,36 +21,43 @@ struct NewWorktreeSheet: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text("New Worktree")
-                .font(.headline)
+        ZStack {
+            Color.black.opacity(0.2)
+                .onTapGesture { isPresented = false }
 
-            Form {
-                TextField("Branch name:", text: $branchName)
-                Picker("Base branch:", selection: $baseBranch) {
-                    ForEach(branches, id: \.self) { branch in
-                        Text(branch).tag(branch)
+            VStack(spacing: 16) {
+                Text("New Worktree")
+                    .font(.headline)
+
+                Form {
+                    TextField("Branch name:", text: $branchName)
+                    Picker("Base branch:", selection: $baseBranch) {
+                        ForEach(branches, id: \.self) { branch in
+                            Text(branch).tag(branch)
+                        }
                     }
                 }
-            }
 
-            if let error = errorMessage {
-                Text(error)
-                    .foregroundStyle(.red)
-                    .font(.caption)
-            }
+                if let error = errorMessage {
+                    Text(error)
+                        .foregroundStyle(.red)
+                        .font(.caption)
+                }
 
-            HStack {
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Spacer()
-                Button("Create & Open") { createWorktree() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(branchName.trimmingCharacters(in: .whitespaces).isEmpty || isCreating)
+                HStack {
+                    Button("Cancel") { isPresented = false }
+                        .keyboardShortcut(.cancelAction)
+                    Spacer()
+                    Button("Create & Open") { createWorktree() }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(branchName.trimmingCharacters(in: .whitespaces).isEmpty || isCreating)
+                }
             }
+            .padding()
+            .frame(width: 300)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .shadow(radius: 8)
         }
-        .padding()
-        .frame(width: 300)
         .task {
             do {
                 branches = try await gitService.listBranches(repoPath: repo.path)
@@ -80,8 +86,7 @@ struct NewWorktreeSheet: View {
                     terminal: appSettings.preferredTerminal,
                     claudeCLIPath: appSettings.claudeCLIPath
                 )
-                await onCreated()
-                dismiss()
+                isPresented = false
             } catch {
                 errorMessage = error.localizedDescription
                 isCreating = false

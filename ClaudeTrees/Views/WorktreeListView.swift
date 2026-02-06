@@ -15,8 +15,8 @@ struct WorktreeListView: View {
     @State private var worktreesByRepo: [UUID: [Worktree]] = [:]
     @State private var errorsByRepo: [UUID: String] = [:]
     @State private var loadingRepos: Set<UUID> = []
-    @State private var showNewWorktreeSheet = false
-    @State private var selectedRepo: Repo?
+    @Binding var showNewWorktreeSheet: Bool
+    @Binding var newWorktreeRepo: Repo?
 
     var body: some View {
         Group {
@@ -61,7 +61,7 @@ struct WorktreeListView: View {
                                 Text(repo.name)
                                 Spacer()
                                 Button {
-                                    selectedRepo = repo
+                                    newWorktreeRepo = repo
                                     showNewWorktreeSheet = true
                                 } label: {
                                     Image(systemName: "plus.circle")
@@ -86,11 +86,9 @@ struct WorktreeListView: View {
                 }
             }
         }
-        .sheet(isPresented: $showNewWorktreeSheet) {
-            if let repo = selectedRepo {
-                NewWorktreeSheet(repo: repo) {
-                    await loadWorktrees(for: repo)
-                }
+        .onChange(of: showNewWorktreeSheet) { oldValue, newValue in
+            if oldValue && !newValue, let repo = newWorktreeRepo {
+                Task { await loadWorktrees(for: repo) }
             }
         }
         .task(id: "loadAll") {
