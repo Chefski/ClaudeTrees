@@ -20,8 +20,13 @@ final class AppSettings {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        let termRaw = defaults.string(forKey: "preferredTerminal") ?? TerminalApp.ghostty.rawValue
-        self.preferredTerminal = TerminalApp(rawValue: termRaw) ?? .ghostty
+        let available = TerminalApp.available
+        let termRaw = defaults.string(forKey: "preferredTerminal") ?? ""
+        if let saved = TerminalApp(rawValue: termRaw), available.contains(saved) {
+            self.preferredTerminal = saved
+        } else {
+            self.preferredTerminal = available.first ?? .terminal
+        }
         self.claudeCLIPath = defaults.string(forKey: "claudeCLIPath") ?? "~/.local/bin/claude"
     }
 

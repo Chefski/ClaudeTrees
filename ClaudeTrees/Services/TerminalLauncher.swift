@@ -13,6 +13,22 @@ enum TerminalApp: String, CaseIterable, Codable, Identifiable {
     case iterm = "iTerm2"
 
     var id: String { rawValue }
+
+    var bundleIdentifier: String {
+        switch self {
+        case .ghostty:  return "com.mitchellh.ghostty"
+        case .terminal: return "com.apple.Terminal"
+        case .iterm:    return "com.googlecode.iterm2"
+        }
+    }
+
+    var isInstalled: Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) != nil
+    }
+
+    static var available: [TerminalApp] {
+        allCases.filter { $0.isInstalled }
+    }
 }
 
 struct TerminalLauncher {

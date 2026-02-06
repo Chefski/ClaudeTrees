@@ -1,2 +1,5 @@
 ## Xcode user-specific files
 xcuserdata/
+
+## Conductor context
+.context/

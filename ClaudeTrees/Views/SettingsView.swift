@@ -19,7 +19,7 @@ struct SettingsView: View {
 
             Form {
                 Picker("Terminal:", selection: $settings.preferredTerminal) {
-                    ForEach(TerminalApp.allCases) { terminal in
+                    ForEach(TerminalApp.available) { terminal in
                         Text(terminal.rawValue).tag(terminal)
                     }
                 }
