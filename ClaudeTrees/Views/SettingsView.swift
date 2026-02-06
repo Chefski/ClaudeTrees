@@ -26,7 +26,7 @@ struct SettingsView: View {
                     Toggle("Launch at Login", isOn: $settings.launchAtLogin)
 
                     Picker("Terminal:", selection: $settings.preferredTerminal) {
-                        ForEach(TerminalApp.allCases) { terminal in
+                        ForEach(TerminalApp.available) { terminal in
                             Text(terminal.rawValue).tag(terminal)
                         }
                     }
