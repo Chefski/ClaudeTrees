@@ -10,6 +10,8 @@ import SwiftUI
 struct WorktreeRow: View {
     let worktree: Worktree
     let onOpen: () -> Void
+    var onCreatePR: (() -> Void)?
+    var onDelete: (() -> Void)?
 
     var body: some View {
         HStack {
@@ -41,6 +43,25 @@ struct WorktreeRow: View {
             }
             .buttonStyle(.plain)
             .help("Open in terminal")
+            if !worktree.isMain, let onCreatePR {
+                Button {
+                    onCreatePR()
+                } label: {
+                    Image(systemName: "arrow.up.right.square")
+                }
+                .buttonStyle(.plain)
+                .help("Create pull request")
+            }
+            if !worktree.isMain, let onDelete {
+                Button {
+                    onDelete()
+                } label: {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+                .help("Remove worktree")
+            }
         }
         .padding(.vertical, 2)
     }

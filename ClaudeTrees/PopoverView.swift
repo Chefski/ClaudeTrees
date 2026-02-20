@@ -13,8 +13,8 @@ struct PopoverView: View {
         case worktrees = "Worktrees"
     }
 
+    @Environment(SettingsWindowManager.self) private var settingsWindowManager
     @State private var selectedTab: Tab = .mcps
-    @State private var showSettings = false
     @State private var showNewWorktreeSheet = false
     @State private var newWorktreeRepo: Repo?
 
@@ -30,7 +30,7 @@ struct PopoverView: View {
                 .labelsHidden()
 
                 Button {
-                    showSettings = true
+                    settingsWindowManager.open()
                 } label: {
                     Image(systemName: "gear")
                 }
@@ -53,11 +53,6 @@ struct PopoverView: View {
         .overlay {
             if showNewWorktreeSheet, let repo = newWorktreeRepo {
                 NewWorktreeSheet(repo: repo, isPresented: $showNewWorktreeSheet)
-            }
-        }
-        .overlay {
-            if showSettings {
-                SettingsView(isPresented: $showSettings)
             }
         }
     }

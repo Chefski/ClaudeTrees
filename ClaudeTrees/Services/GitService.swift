@@ -31,8 +31,17 @@ final class GitService {
             .appending("/\(URL(fileURLWithPath: repoPath).lastPathComponent)-\(branchName)")
     }
 
-    nonisolated func removeWorktree(repoPath: String, worktreePath: String) async throws {
-        _ = try await run("git", args: ["-C", repoPath, "worktree", "remove", worktreePath])
+    nonisolated func removeWorktree(repoPath: String, worktreePath: String, force: Bool = false) async throws {
+        var args = ["-C", repoPath, "worktree", "remove"]
+        if force { args.append("--force") }
+        args.append(worktreePath)
+        _ = try await run("git", args: args)
+        _ = try await run("git", args: ["-C", repoPath, "worktree", "prune"])
+    }
+
+    nonisolated func hasUncommittedChanges(worktreePath: String) async throws -> Bool {
+        let output = try await run("git", args: ["-C", worktreePath, "status", "--porcelain"])
+        return !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     nonisolated func listBranches(repoPath: String) async throws -> [String] {
@@ -41,6 +50,27 @@ final class GitService {
             .components(separatedBy: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+    }
+
+    nonisolated func getRemoteURL(worktreePath: String) async throws -> String {
+        let output = try await run("git", args: ["-C", worktreePath, "remote", "get-url", "origin"])
+        return output.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    nonisolated static func gitHubBaseURL(from remoteURL: String) -> String? {
+        // SSH: git@github.com:owner/repo.git
+        if remoteURL.hasPrefix("git@github.com:") {
+            var path = String(remoteURL.dropFirst("git@github.com:".count))
+            if path.hasSuffix(".git") { path = String(path.dropLast(4)) }
+            return "https://github.com/\(path)"
+        }
+        // HTTPS: https://github.com/owner/repo.git
+        if remoteURL.hasPrefix("https://github.com/") {
+            var url = remoteURL
+            if url.hasSuffix(".git") { url = String(url.dropLast(4)) }
+            return url
+        }
+        return nil
     }
 
     // MARK: - Private

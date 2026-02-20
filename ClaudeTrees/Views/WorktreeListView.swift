@@ -15,6 +15,13 @@ struct WorktreeListView: View {
     @State private var worktreesByRepo: [UUID: [Worktree]] = [:]
     @State private var errorsByRepo: [UUID: String] = [:]
     @State private var loadingRepos: Set<UUID> = []
+    @State private var worktreeToDelete: (worktree: Worktree, repo: Repo)?
+    @State private var deleteHasChanges = false
+
+    @State private var checkingChanges = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
+    @State private var showDeleteError = false
     @Binding var showNewWorktreeSheet: Bool
     @Binding var newWorktreeRepo: Repo?
 
@@ -42,13 +49,17 @@ struct WorktreeListView: View {
                                     .foregroundStyle(.red)
                             } else if let trees = worktreesByRepo[repo.id], !trees.isEmpty {
                                 ForEach(trees) { tree in
-                                    WorktreeRow(worktree: tree) {
+                                    WorktreeRow(worktree: tree, onOpen: {
                                         TerminalLauncher.open(
                                             path: tree.path,
                                             terminal: appSettings.preferredTerminal,
                                             claudeCLIPath: appSettings.claudeCLIPath
                                         )
-                                    }
+                                    }, onCreatePR: tree.isMain ? nil : {
+                                        openCreatePR(for: tree)
+                                    }, onDelete: tree.isMain ? nil : {
+                                        confirmDelete(worktree: tree, repo: repo)
+                                    })
                                 }
                             } else {
                                 Text("No worktrees")
@@ -94,6 +105,29 @@ struct WorktreeListView: View {
         .task(id: "loadAll") {
             await loadAllWorktrees()
         }
+        .alert("Delete Failed", isPresented: $showDeleteError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(deleteError ?? "")
+        }
+        .overlay {
+            if checkingChanges || isDeleting {
+                ZStack {
+                    Color.black.opacity(0.2)
+                        .ignoresSafeArea()
+
+                    VStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(isDeleting ? "Deleting..." : "Checking for changes...")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding()
+                    .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                }
+            }
+        }
     }
 
     private func addRepo() {
@@ -132,6 +166,59 @@ struct WorktreeListView: View {
         } catch {
             errorsByRepo[repo.id] = error.localizedDescription
             worktreesByRepo[repo.id] = []
+        }
+    }
+
+    private func openCreatePR(for worktree: Worktree) {
+        guard let branch = worktree.branch else { return }
+        Task {
+            guard let remoteURL = try? await gitService.getRemoteURL(worktreePath: worktree.path),
+                  let baseURL = GitService.gitHubBaseURL(from: remoteURL),
+                  let url = URL(string: "\(baseURL)/compare/\(branch)?expand=1")
+            else { return }
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func confirmDelete(worktree: Worktree, repo: Repo) {
+        worktreeToDelete = (worktree, repo)
+        deleteHasChanges = false
+        checkingChanges = true
+        Task {
+            do {
+                deleteHasChanges = try await gitService.hasUncommittedChanges(worktreePath: worktree.path)
+            } catch {
+                deleteHasChanges = false
+            }
+            checkingChanges = false
+
+            let alert = NSAlert()
+            alert.messageText = deleteHasChanges ? "Uncommitted Changes" : "Remove Worktree?"
+            alert.informativeText = deleteHasChanges
+                ? "The branch \"\(worktree.branch ?? "")\" has uncommitted changes that will be permanently lost."
+                : "This will remove the worktree for \"\(worktree.branch ?? "")\"."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: deleteHasChanges ? "Delete Anyway" : "Delete")
+            alert.addButton(withTitle: "Cancel")
+            alert.buttons.first?.hasDestructiveAction = true
+
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+            isDeleting = true
+            await deleteWorktree(worktree, from: repo, force: deleteHasChanges)
+            isDeleting = false
+        }
+    }
+
+    private func deleteWorktree(_ worktree: Worktree, from repo: Repo, force: Bool) async {
+        do {
+            try await gitService.removeWorktree(repoPath: repo.path, worktreePath: worktree.path, force: force)
+            worktreeToDelete = nil
+            await loadWorktrees(for: repo)
+        } catch {
+            worktreeToDelete = nil
+            deleteError = error.localizedDescription
+            showDeleteError = true
         }
     }
 }
